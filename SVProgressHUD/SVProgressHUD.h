@@ -112,7 +112,7 @@ typedef void (^SVProgressHUDDismissCompletion)(void);
 + (void)setHapticsEnabled:(BOOL)hapticsEnabled;						    // default is NO
 + (void)setMotionEffectEnabled:(BOOL)motionEffectEnabled;               // default is YES
 + (void)setCancelButtonEnabled:(BOOL)cancelButtonEnabled;               // default is NO
-+ (void)setCancelButtonAction:(void(^)(void))cancelButtonAction;
++ (void)setCancelButtonAction:(void(^_Nullable)(void))cancelButtonAction;
 
 #pragma mark - Show Methods
 
