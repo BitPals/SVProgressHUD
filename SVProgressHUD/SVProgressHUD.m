@@ -211,6 +211,15 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
     [self sharedView].motionEffectEnabled = motionEffectEnabled;
 }
 
++ (void)setCancelButtonEnabled:(BOOL)cancelButtonEnabled {
+    [self sharedView].cancelButtonEnabled = cancelButtonEnabled;
+    [SVProgressHUD setDefaultMaskType:SVProgressHUDMaskTypeClear];
+}
+
++ (void)setCancelButtonAction:(void(^)(void))cancelButtonAction {
+    [self sharedView].cancelButtonAction = cancelButtonAction;
+}
+
 #pragma mark - Show Methods
 
 + (void)show {
@@ -440,6 +449,11 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
         
         _hapticsEnabled = NO;
         _motionEffectEnabled = YES;
+
+        _cancelButton = [UIButton buttonWithType:UIButtonTypeCustom];
+        [_cancelButton setTitle:NSLocalizedString(@"Cancel", nil) forState:UIControlStateNormal];
+        _cancelButtonEnabled = NO;
+        _cancelButtonAction = nil;
         
         // Accessibility support
         self.accessibilityIdentifier = @"SVProgressHUD";
@@ -494,6 +508,10 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
         hudHeight += SVProgressHUDLabelSpacing;
     }
     
+    if (self.cancelButtonEnabled) {
+        hudHeight += 30.0;
+    }
+
     // Update values on subviews
     self.hudView.bounds = CGRectMake(0.0f, 0.0f, MAX(self.minimumSize.width, hudWidth), MAX(self.minimumSize.height, hudHeight));
     
@@ -524,6 +542,10 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
     self.statusLabel.frame = labelRect;
     self.statusLabel.center = CGPointMake(CGRectGetMidX(self.hudView.bounds), centerY);
     
+    if (self.cancelButtonEnabled) {
+        self.cancelButton.frame = CGRectMake(0, CGRectGetMaxY(self.statusLabel.frame) + 10.0, CGRectGetWidth(self.hudView.bounds), 20);
+    }
+
     [CATransaction commit];
 }
 
@@ -743,12 +765,18 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
 #pragma mark - Event handling
 
 - (void)controlViewDidReceiveTouchEvent:(id)sender forEvent:(UIEvent*)event {
+    UITouch *touch = event.allTouches.anyObject;
+    CGPoint touchLocation = [touch locationInView:self];
+
+    CGRect cancelFrame = [self.cancelButton convertRect:self.cancelButton.bounds toView:self];
+    if(CGRectContainsPoint(cancelFrame, touchLocation) && self.cancelButtonEnabled) {
+        [self cancelButtonTapped:self.cancelButton];
+        return;
+    }
+
     [[NSNotificationCenter defaultCenter] postNotificationName:SVProgressHUDDidReceiveTouchEventNotification
                                                         object:self
                                                       userInfo:[self notificationUserInfo]];
-    
-    UITouch *touch = event.allTouches.anyObject;
-    CGPoint touchLocation = [touch locationInView:self];
     
     if(CGRectContainsPoint(self.hudView.frame, touchLocation)) {
         [[NSNotificationCenter defaultCenter] postNotificationName:SVProgressHUDDidTouchDownInsideNotification
@@ -784,6 +812,16 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
             strongSelf.statusLabel.hidden = status.length == 0;
             strongSelf.statusLabel.text = status;
             strongSelf.progress = progress;
+
+            strongSelf.cancelButton.hidden = !strongSelf.cancelButtonEnabled;
+            [strongSelf.cancelButton setUserInteractionEnabled: strongSelf.cancelButtonEnabled];
+
+            if (strongSelf.cancelButtonEnabled) {
+                [strongSelf.hudView.contentView addSubview:strongSelf.cancelButton];
+                [strongSelf.cancelButton addTarget:self
+                                            action:@selector(cancelButtonTapped:)
+                                  forControlEvents:UIControlEventTouchUpInside];
+            }
             
             // Choose the "right" indicator depending on the progress
             if(progress >= 0) {
@@ -882,6 +920,23 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
             }
         }
     }];
+}
+
+- (void)cancelButtonTapped:(id)sender {
+    if (_cancelButtonAction != nil) {
+        _cancelButtonAction();
+    }
+
+    _cancelButtonEnabled = false;
+    self.defaultMaskType = SVProgressHUDMaskTypeNone;
+    [self dismiss];
+}
+
+- (UIButton*)cancelButton {
+    [_cancelButton setBackgroundColor: [UIColor clearColor]];
+    [_cancelButton setTitleColor:self.tintColor forState:UIControlStateNormal];
+    [_cancelButton.titleLabel setFont:self.font];
+    return _cancelButton;
 }
 
 - (void)fadeIn:(id)data {
